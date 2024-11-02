@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request, url_for, session, redirect
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Use the 'Agg' backend for non-GUI rendering
@@ -6,31 +6,22 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import io
 import base64
+import os
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)  # Secret key for session management
 
+# Function to generate and save plots
 def generate_plots(N, mu, sigma2, S):
+    X = np.random.rand(N)
+    Y = mu + np.sqrt(sigma2) * np.random.randn(N)
 
-    # STEP 1
-    # TODO 1: Generate a random dataset X of size N with values between 0 and 1
-    # and a random dataset Y with normal additive error (mean mu, variance sigma^2).
-    # Hint: Use numpy's random's functions to generate values for X and Y
-    X = np.random.rand(N)  # Replace with code to generate random values for X
-    Y = mu + np.sqrt(sigma2) * np.random.randn(N)  # Replace with code to generate random values for Y with specified mean and variance
-
-    # TODO 2: Fit a linear regression model to X and Y
     X = X.reshape(-1, 1)
-    # Hint: Use Scikit Learn
     model = LinearRegression()
-    model.fit(X, Y)  # Replace with code to fit the model
-    slope = model.coef_[0]  # Replace with code to extract slope from the fitted model
-    intercept = model.intercept_  # Replace with code to extract intercept from the fitted model
+    model.fit(X, Y)
+    slope = model.coef_[0]
+    intercept = model.intercept_
 
-    # TODO 3: Generate a scatter plot of (X, Y) with the fitted regression line
-    # Hint: Use Matplotlib
-    # Label the x-axis as "X" and the y-axis as "Y".
-    # Add a title showing the regression line equation using the slope and intercept values.
-    # Finally, save the plot to "static/plot1.png" using plt.savefig()
     plt.figure()
     plt.scatter(X, Y, color='blue', label='Data Points')
     plt.plot(X, model.predict(X), color='red', linewidth=2, label='Fitted Line')
@@ -38,38 +29,21 @@ def generate_plots(N, mu, sigma2, S):
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.legend()
-    plot1_path = "static/plot1.png"
+    plot1_path = f"static/plot1_{len(session['results'])}.png"
     plt.savefig(plot1_path)
     plt.close()
-    # Replace the above TODO 3 block with code to generate and save the plot
 
-    
-    # Step 2: Run S simulations and create histograms of slopes and intercepts
-
-    # TODO 1: Initialize empty lists for slopes and intercepts
-    # Hint: You will store the slope and intercept of each simulation's linear regression here.
-    slopes = []  # Replace with code to initialize empty list
-    intercepts = []  # Replace with code to initialize empty list
-
-    # TODO 2: Run a loop S times to generate datasets and calculate slopes and intercepts
-    # Hint: For each iteration, create random X and Y values using the provided parameters
+    slopes = []
+    intercepts = []
     for _ in range(S):
-        # TODO: Generate random X values with size N between 0 and 1
-        X_sim = np.random.rand(N)  # Replace with code to generate X values
-
-        # TODO: Generate Y values with normal additive error (mean mu, variance sigma^2)
-        Y_sim = mu + np.sqrt(sigma2) * np.random.randn(N)  # Replace with code to generate Y values
+        X_sim = np.random.rand(N)
+        Y_sim = mu + np.sqrt(sigma2) * np.random.randn(N)
         X_sim = X_sim.reshape(-1, 1)
-        # TODO: Fit a linear regression model to X_sim and Y_sim
         sim_model = LinearRegression()
-        sim_model.fit(X_sim, Y_sim)  
-        
+        sim_model.fit(X_sim, Y_sim)
+        slopes.append(sim_model.coef_[0])
+        intercepts.append(sim_model.intercept_)
 
-        # TODO: Append the slope and intercept of the model to slopes and intercepts lists
-        slopes.append(sim_model.coef_[0])  # Replace None with code to append slope
-        intercepts.append(sim_model.intercept_)  # Replace None with code to append intercept
-
-    # Plot histograms of slopes and intercepts
     plt.figure(figsize=(10, 5))
     plt.hist(slopes, bins=20, alpha=0.5, color="blue", label="Slopes")
     plt.hist(intercepts, bins=20, alpha=0.5, color="orange", label="Intercepts")
@@ -79,21 +53,25 @@ def generate_plots(N, mu, sigma2, S):
     plt.xlabel("Value")
     plt.ylabel("Frequency")
     plt.legend()
-    plot2_path = "static/plot2.png"
+    plot2_path = f"static/plot2_{len(session['results'])}.png"
     plt.savefig(plot2_path)
     plt.close()
 
-    # Below code is already provided
-    # Calculate proportions of more extreme slopes and intercepts
-    # For slopes, we will count how many are greater than the initial slope; for intercepts, count how many are less.
-    slope_more_extreme = sum(s > slope for s in slopes) / S  # Already provided
-    intercept_more_extreme = sum(i < intercept for i in intercepts) / S  # Already provided
+    slope_more_extreme = sum(s > slope for s in slopes) / S
+    intercept_more_extreme = sum(i < intercept for i in intercepts) / S
 
-    return plot1_path, plot2_path, slope_more_extreme, intercept_more_extreme
+    return plot1_path, plot2_path, slope_more_extreme, intercept_more_extreme, slope, intercept
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    if 'results' not in session:
+        session['results'] = []
+
     if request.method == "POST":
+        if request.form.get("clear"):
+            session.pop('results', None)
+            return redirect(url_for('index'))
+
         # Get user input
         N = int(request.form["N"])
         mu = float(request.form["mu"])
@@ -101,12 +79,20 @@ def index():
         S = int(request.form["S"])
 
         # Generate plots and results
-        plot1, plot2, slope_extreme, intercept_extreme = generate_plots(N, mu, sigma2, S)
+        plot1, plot2, slope_extreme, intercept_extreme, slope, intercept = generate_plots(N, mu, sigma2, S)
 
-        return render_template("index.html", plot1=plot1, plot2=plot2,
-                               slope_extreme=slope_extreme, intercept_extreme=intercept_extreme)
+        # Save results in session
+        session['results'].append({
+            'N': N, 'mu': mu, 'sigma2': sigma2, 'S': S,
+            'plot1': plot1, 'plot2': plot2,
+            'slope': slope, 'intercept': intercept,
+            'slope_extreme': slope_extreme, 'intercept_extreme': intercept_extreme
+        })
+        session.modified = True
 
-    return render_template("index.html")
+        return redirect(url_for('index'))
+
+    return render_template("index.html", results=session.get('results', []))
 
 if __name__ == "__main__":
     app.run(debug=True)

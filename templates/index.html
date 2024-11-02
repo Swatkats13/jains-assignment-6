@@ -2,37 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Linear Regression Assumptions</title>
+    <title>Linear Regression Demo</title>
 </head>
 <body>
-    <h1>Interactive Linear Regression Assumptions</h1>
-
+    <h1>Linear Regression Simulation</h1>
     <form method="POST">
-        <label for="N">Sample Size (N):</label>
+        <label for="N">Sample size (N):</label>
         <input type="number" id="N" name="N" required><br>
-
         <label for="mu">Mean (μ):</label>
-        <input type="number" step="any" id="mu" name="mu" required><br>
-
+        <input type="number" id="mu" name="mu" step="0.01" required><br>
         <label for="sigma2">Variance (σ²):</label>
-        <input type="number" step="any" id="sigma2" name="sigma2" required><br>
-
-        <label for="S">Number of Simulations (S):</label>
+        <input type="number" id="sigma2" name="sigma2" step="0.01" required><br>
+        <label for="S">Number of simulations (S):</label>
         <input type="number" id="S" name="S" required><br>
-
         <button type="submit">Generate</button>
     </form>
+    <form method="POST">
+        <button type="submit" name="clear" value="true">Clear Page</button>
+    </form>
 
-    {% if plot1 and plot2 %}
-        <h2>Generated Plot</h2>
-        <img src="{{ plot1 }}" alt="Regression Plot" style="width: 600px;">
+    {% if results %}
+        <h2>Generated Results</h2>
+        {% for result in results %}
+            <div>
+                <p><strong>Sample Size (N):</strong> {{ result.N }}</p>
+                <p><strong>Mean (μ):</strong> {{ result.mu }}</p>
+                <p><strong>Variance (σ²):</strong> {{ result.sigma2 }}</p>
+                <p><strong>Number of Simulations (S):</strong> {{ result.S }}</p>
+                <p><strong>Calculated Slope:</strong> {{ result.slope }}</p>
+                <p><strong>Calculated Intercept:</strong> {{ result.intercept }}</p>
+                <p><strong>Proportion of Slopes More Extreme:</strong> {{ result.slope_extreme }}</p>
+                <p><strong>Proportion of Intercepts More Extreme:</strong> {{ result.intercept_extreme }}</p>
 
-        <h2>Histogram of Slopes and Intercepts</h2>
-        <img src="{{ plot2 }}" alt="Histograms" style="width: 600px;">
+                <h3>Generated Plot</h3>
+                <img src="{{ result.plot1 }}" alt="Generated Plot">
 
-        <p>Proportion of slopes more extreme than calculated slope: {{ slope_extreme | round(2) }}</p>
-        <p>Proportion of intercepts more extreme than calculated intercept: {{ intercept_extreme | round(2) }}</p>
+                <h3>Histogram of Slopes and Intercepts</h3>
+                <img src="{{ result.plot2 }}" alt="Histogram Plot">
+            </div>
+            <hr>
+        {% endfor %}
     {% endif %}
 </body>
 </html>
